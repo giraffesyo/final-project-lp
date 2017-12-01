@@ -1,0 +1,77 @@
+package org.drools.workshop;
+import org.drools.workshop.model.*;
+
+
+rule "If lightswitch is off, only sunlight is available"
+    when
+        $light : AvailableLight()
+        $switch : Lightswitch( onStatus == false )
+    then
+        $light.setOutputLights(0);
+end
+
+rule "If no daylight available, and switch is on, light should be at 100%"
+	when
+		$light: AvailableLight()
+		$switch : Lightswitch( onStatus == true )
+	then
+		$light.setOutputLights(100);
+end
+
+rule "If enough daylight is available, and switch is on, lights are off"
+	when
+		$light : AvailableLight(  $natural : outputDaylight )
+		$switch : Lightswitch ( onStatus == true, $threshold : threshold )
+		eval( $natural > $threshold )
+	then
+		$switch.setOnStatus(false);
+end
+
+rule "Switch is on, daylight is available, but < threshold, lights are on at dimmed value"
+	when
+		$light : AvailableLight( $artificial : outputLights, $natural : outputDaylight )
+		$switch : Lightswitch ( onStatus == true, $threshold : threshold )
+		eval( $threshold > $natural )
+	then
+		int neededLight = $threshold - $natural - $artificial;
+		$light.setOutputLights($artificial + neededLight);
+end
+
+rule "Switch is on, too much combined natural/artificial light is available, dim lights"
+	when
+		$light : AvailableLight( $artificial : outputLights, $natural : outputDaylight )
+		$switch : Lightswitch ( onStatus == true, $threshold : threshold )
+		eval( $natural + $artificial > $threshold )
+	then
+		int neededLight = $threshold - $natural - $artificial; //can be negative, no problem
+		$light.setOutputLights($artificial + neededLight);
+end
+
+rule "Switch is on, not enough combined natural/artificial light is available, brighten lights"
+	when
+		$light : AvailableLight( $artificial : outputLights, $natural : outputDaylight )
+		$switch : Lightswitch ( onStatus == true, $threshold : threshold )
+		eval( $threshold > $natural + $artificial )
+	then
+		int neededLight = $threshold - $natural - $artificial;
+		$light.setOutputLights($artificial + neededLight);
+end
+
+rule "If past absence time threshold, turn off lights, regardless of switch"
+	when
+		$switch : Lightswitch ( onStatus == true, $time : timeThreshold )
+		AbsenceSensor($timeAbsent : timeAbsent)
+		eval( $timeAbsent >= $time) 
+	then
+		$switch.setOnStatus(false);
+end
+
+//Print statements to evaluate how much light is available? 
+rule "How much total light is available?"
+	when
+		AvailableLight($artificial : outputLights, $natural : outputDaylight)
+	then
+		int $available = $artificial + $natural;
+		System.out.println("Currently lighting is at " + $available + "%" );
+end
+
